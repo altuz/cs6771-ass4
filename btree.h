@@ -264,15 +264,36 @@ public:
         *                 because no matching element was there prior to the insert call.
         */
     std::pair<iterator, bool> insert(const T& elem) {
-        auto res = find(elem);
-        if(res != end()) {
-            return std::make_pair<iterator, bool>(res, false);
-        }
-
+        return insert(elem, _root);
     };
 
     std::pair<iterator, bool> insert(const T& elem, std::shared_ptr<bnode> node) {
+        if (node) {
+            auto &c_nodes = node->_childVals;
+            auto &c_trees = node->_childTrees;
+            auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
+            if(lower_bound != c_nodes.end()) {
+                if(*lower_bound == elem){
+                    return std::make_pair<iterator, bool>({lower_bound, node}, false);
+                }
+                else if(c_nodes.size() < node->_size) {
+                    // not found and can be inserted
+                    auto elem_it = c_nodes.insert(lower_bound, elem);
+                    return std::make_pair<iterator, bool>({elem_it, node}, true);
+                }
+            }
+            // not found, and current node is full, go to the corresponding subtree
+            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound) + 1;
+            auto subtree     = c_trees[subtree_idx];
+            if (subtree) {
+                return insert(elem, subtree);
+            }
+            else {
+                // if subtree doesn't exist, create one
 
+            }
+        }
+        return std::make_pair<iterator, bool>(end(), false);
     }
     /**
         * Disposes of all internal resources, which includes
