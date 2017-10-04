@@ -27,6 +27,11 @@ class btree {
 private:
     // The details of your implementation go here
     unsigned int _size;
+    // TODO: Combine vals and trees?
+    //       In total you will have n + 1 sub-trees.
+    //       Each sub-tree has a value, and their child have to be strictly less than that value
+    //              but higher than the immediate preceding sub-tree
+    //       Right most subtree will be tricky, but never include the (n + 1)th value at any point, since that is imaginary.
     std::vector<T> _childVals;
     std::vector<std::shared_ptr<btree<T>>> _childTrees;
     /**
