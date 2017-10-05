@@ -49,7 +49,6 @@ private:
 
         std::vector<T> bfs() const {
             // Copy all values
-            std::cout << "Size is :" << _childVals.size() << "\n";
             std::vector<T> res(_childVals);
             for(auto child : _childTrees) {
                 auto c_res = (*child).bfs();
@@ -205,8 +204,8 @@ public:
 
     iterator find(const T& elem, std::shared_ptr<bnode> node) {
         if (node) {
-            auto c_nodes = node->_childVals;
-            auto c_trees = node->_childTrees;
+            auto &c_nodes = node->_childVals;
+            auto &c_trees = node->_childTrees;
             auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
             // check if lower bound is end of iterator
             if(lower_bound != c_nodes.end()) {
@@ -216,7 +215,7 @@ public:
                     return iterator(lower_bound, node);
                 }
                 // elem not found
-                auto subtree_idx = std::distance(c_nodes.begin(), lower_bound) + 1;
+                auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
                 auto subtree     = c_trees[subtree_idx];
                 if (subtree) {
                     return find(elem, subtree);
@@ -272,26 +271,28 @@ public:
             auto &c_nodes = node->_childVals;
             auto &c_trees = node->_childTrees;
             auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
+            // test lower bound
             if(lower_bound != c_nodes.end()) {
                 if(*lower_bound == elem){
                     return std::make_pair<iterator, bool>({lower_bound, node}, false);
                 }
-                else if(c_nodes.size() < node->_size) {
-                    // not found and can be inserted
-                    auto elem_it = c_nodes.insert(lower_bound, elem);
-                    return std::make_pair<iterator, bool>({elem_it, node}, true);
-                }
+            }
+            // there is still space in node
+            if(c_nodes.size() < node->_size) {
+                // not found and can be inserted
+                auto elem_it = c_nodes.insert(lower_bound, elem);
+                return std::make_pair<iterator, bool>({elem_it, node}, true);
             }
             // not found, and current node is full, go to the corresponding subtree
-            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound) + 1;
+            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
             auto subtree     = c_trees[subtree_idx];
-            if (subtree) {
-                return insert(elem, subtree);
-            }
-            else {
+            (void) subtree; (void) subtree_idx;
+            std::cout << "Index of subtree: " << subtree_idx << "\n";
+            if (!subtree) {
                 // if subtree doesn't exist, create one
-
+                subtree = std::make_shared<bnode>(bnode(node->_size));
             }
+            return insert(elem, subtree);
         }
         return std::make_pair<iterator, bool>(end(), false);
     }
