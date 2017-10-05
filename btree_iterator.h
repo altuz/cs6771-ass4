@@ -21,7 +21,9 @@ public:
 
     typedef typename btree<T>::bnode tree_node;
     typedef typename std::vector<T>::iterator location;
-    reference operator*() const;
+    reference operator*() const {
+        return (*_currNode);
+    };
     pointer operator->() const { return &(operator*()); }
     btree_iterator& operator++();
     bool operator==(const btree_iterator& other) const {

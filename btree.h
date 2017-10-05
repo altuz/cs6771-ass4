@@ -38,12 +38,11 @@ private:
         std::vector<std::shared_ptr<bnode>> _childTrees;
         std::shared_ptr<bnode> _parent;
 
-        bnode(size_t maxNodeElems = 40) : _size(maxNodeElems) {
+        bnode(size_t maxNodeElems = 40) : _size(maxNodeElems), _childTrees(_size + 1) {
             _childVals.reserve(_size);
             // There are n-1 sub-trees in between the n values.
             // There are one sub-tree in each end
             // Thus in total we have n + 1 sub trees
-            _childTrees.reserve(_size + 1);
             _parent = nullptr;
         };
 
@@ -51,6 +50,8 @@ private:
             // Copy all values
             std::vector<T> res(_childVals);
             for(auto child : _childTrees) {
+                if(!child)
+                    continue;
                 auto c_res = (*child).bfs();
                 std::move(c_res.begin(), c_res.end(), std::back_inserter(res));
             }
@@ -103,8 +104,7 @@ public:
         // Insert them one by one
         auto all_values = original._root->bfs();
         for (auto i : all_values) {
-            (void) i;
-            // this->insert(i);
+            this->insert(i);
         }
     };
 
@@ -152,6 +152,7 @@ public:
      */
     friend std::ostream& operator<< (std::ostream& os, const btree<T>& tree) {
         auto vals = tree._root->bfs();
+        std::cout << "There are " << vals.size() << "nodes \n";
         for (auto i = vals.cbegin(); i != vals.cend(); ++i) {
             if (i != vals.cbegin())
                 os << ' ';
@@ -283,11 +284,12 @@ public:
                 auto elem_it = c_nodes.insert(lower_bound, elem);
                 return std::make_pair<iterator, bool>({elem_it, node}, true);
             }
+            (void) c_trees;
             // not found, and current node is full, go to the corresponding subtree
             auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
-            auto subtree     = c_trees[subtree_idx];
+            auto &subtree     = c_trees[subtree_idx];
             (void) subtree; (void) subtree_idx;
-            std::cout << "Index of subtree: " << subtree_idx << "\n";
+            // std::cout << "Index of subtree: " << subtree_idx << "\n";
             if (!subtree) {
                 // if subtree doesn't exist, create one
                 subtree = std::make_shared<bnode>(bnode(node->_size));
