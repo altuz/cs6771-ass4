@@ -36,16 +36,24 @@ private:
         unsigned int _size;
         std::vector<T> _childVals;
         std::vector<std::shared_ptr<bnode>> _childTrees;
-        std::shared_ptr<bnode> _parent;
+        std::weak_ptr<bnode> _parent;
 
-        bnode(size_t maxNodeElems = 40) : _size(maxNodeElems), _childTrees(_size + 1) {
+        bnode(size_t maxNodeElems = 40, std::shared_ptr<bnode> parent = nullptr) : _size(maxNodeElems), _childTrees(_size + 1), _parent(parent) {
             _childVals.reserve(_size);
             // There are n-1 sub-trees in between the n values.
             // There are one sub-tree in each end
             // Thus in total we have n + 1 sub trees
-            _parent = nullptr;
         };
 
+        ~bnode() {
+            // _parent.reset();
+            // _childVals.erase(_childVals.begin(), _childVals.end());
+            // _childTrees.erase(_childTrees.begin(), _childTrees.end());
+        };
+        /**
+         * Goes through the tree using level-order traversal a.k.a bfs
+         * Returns a vector of the values
+         */
         std::vector<T> bfs() const {
             // Copy all values
             std::vector<T> res(_childVals);
@@ -60,15 +68,24 @@ private:
     };
 
     std::shared_ptr<bnode> _root;
-    /**
-     * Goes through the tree using level-order traversal a.k.a bfs
-     * Returns a vector of the values
-     */
+
+    using dt_tuple = std::pair<size_t, std::shared_ptr<bnode>>;
+
 public:
     /** Hmm, need some iterator typedefs here... friends? **/
-    friend class btree_iterator<T>;
-    typedef btree_iterator<T> iterator;
-    typedef const_btree_iterator<T> const_iterator;
+    using iterator = btree_iterator<T>;
+    using const_iterator = btree_iterator<T, std::add_const>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    friend const_iterator;
+    friend iterator;
+    friend reverse_iterator;
+    friend const_reverse_iterator;
+
+
+    // friend class const_btree_iterator<T>;
+
+    // typedef const_btree_iterator<T> const_iterator;
     /**
      * Constructs an empty btree.    Note that
      * the elements stored in your btree must
@@ -152,7 +169,7 @@ public:
      */
     friend std::ostream& operator<< (std::ostream& os, const btree<T>& tree) {
         auto vals = tree._root->bfs();
-        std::cout << "There are " << vals.size() << "nodes \n";
+        std::cout << "There are " << vals.size() << " nodes \n";
         for (auto i = vals.cbegin(); i != vals.cend(); ++i) {
             if (i != vals.cbegin())
                 os << ' ';
@@ -172,18 +189,68 @@ public:
      * -- crbegin()
      * -- crend()
      */
-     iterator end() {
-        return findEnd(_root);
-     };
 
-     iterator findEnd(std::shared_ptr<bnode> node) {
-         auto dist = std::distance(std::begin(node->_childVals), std::end(node->_childVals));
-         if(dist == node->_size) {
-             auto final_subtree = node->_childTrees[node->_size];
-             if(final_subtree)
-                return findEnd(final_subtree);
-         }
-         return iterator(std::end(node->_childVals), node);
+     reverse_iterator rbegin() {
+         return reverse_iterator(end());
+     }
+
+     reverse_iterator rend() {
+          return reverse_iterator(begin());
+     }
+
+     const_reverse_iterator rcbegin() const {
+         return const_reverse_iterator(cend());
+     }
+
+     const_reverse_iterator rcend() const {
+         return const_reverse_iterator(cbegin());
+     }
+
+     const_reverse_iterator rbegin() const {
+         return rcbegin();
+     }
+
+     const_reverse_iterator rend() const {
+         return rcend();
+     }
+
+     const_iterator cend() const {
+         auto pair = findMax(_root);
+         auto dist = pair.first;
+         auto tree = pair.second;
+         auto vec_it = tree->_childVals.begin() + dist;
+         return const_iterator(vec_it, tree, true);
+     }
+
+     const_iterator cbegin() const {
+         auto pair = findMin(_root);
+         auto dist = pair.first;
+         auto tree = pair.second;
+         auto vec_it = tree->_childVals.begin() + dist;
+         return const_iterator(vec_it, tree);
+     }
+     /**
+      * Non Const
+      */
+     iterator end() {
+         auto pair = findMax(_root);
+         auto dist = pair.first;
+         auto tree = pair.second;
+         auto vec_it = tree->_childVals.begin() + dist;
+         return iterator(vec_it, tree, true);
+     };
+     const_iterator end() const {
+         return cend();
+     }
+     iterator begin() {
+         auto pair = findMin(_root);
+         auto dist = pair.first;
+         auto tree = pair.second;
+         auto vec_it = tree->_childVals.begin() + dist;
+         return iterator(vec_it, tree);
+     }
+     const_iterator begin() const {
+         return cbegin();
      }
     /**
         * Returns an iterator to the matching element, or whatever
@@ -200,30 +267,32 @@ public:
         *                 non-const end() returns if no such match was ever found.
         */
     iterator find(const T& elem) {
-        return find(elem, _root);
+        auto pair = find(elem, _root);
+        auto dist = pair.first;
+        auto tree = pair.second;
+        auto vec_it = tree->_childVals.begin() + dist;
+        return iterator(vec_it, tree, (*vec_it != elem));
     };
 
-    iterator find(const T& elem, std::shared_ptr<bnode> node) {
+    dt_tuple find(const T& elem, std::shared_ptr<bnode> node) const {
         if (node) {
             auto &c_nodes = node->_childVals;
             auto &c_trees = node->_childTrees;
             auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
+            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
             // check if lower bound is end of iterator
-            if(lower_bound != c_nodes.end()) {
                 // check value
-                if(*lower_bound == elem) {
-                    // elem is found
-                    return iterator(lower_bound, node);
-                }
-                // elem not found
-                auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
-                auto subtree     = c_trees[subtree_idx];
-                if (subtree) {
-                    return find(elem, subtree);
-                }
+            if(*lower_bound == elem) {
+                // elem is found
+                return dt_tuple(subtree_idx , node);
+            }
+            // elem not found
+            auto subtree     = c_trees[subtree_idx];
+            if (subtree) {
+                return find(elem, subtree);
             }
         }
-        return end();
+        return findMax(_root);
     };
     /**
         * Identical in functionality to the non-const version of find,
@@ -234,7 +303,13 @@ public:
         * @return an iterator to the matching element, or whatever the
         *                 const end() returns if no such match was ever found.
         */
-    const_iterator find(const T& elem) const;
+    const_iterator find(const T& elem) const {
+        auto pair = find(elem, _root);
+        auto dist = pair.first;
+        auto tree = pair.second;
+        auto vec_it = tree->_childVals.begin() + dist;
+        return const_iterator(vec_it, tree, (*vec_it != elem));
+    };
 
     /**
         * Operation which inserts the specified element
@@ -284,19 +359,42 @@ public:
                 auto elem_it = c_nodes.insert(lower_bound, elem);
                 return std::make_pair<iterator, bool>({elem_it, node}, true);
             }
-            (void) c_trees;
             // not found, and current node is full, go to the corresponding subtree
             auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
             auto &subtree     = c_trees[subtree_idx];
-            (void) subtree; (void) subtree_idx;
             // std::cout << "Index of subtree: " << subtree_idx << "\n";
             if (!subtree) {
                 // if subtree doesn't exist, create one
-                subtree = std::make_shared<bnode>(bnode(node->_size));
+                subtree = std::make_shared<bnode>(bnode(node->_size, node));
             }
             return insert(elem, subtree);
         }
         return std::make_pair<iterator, bool>(end(), false);
+    }
+    /**
+     * Helper functions, one finds local minimum and the other find local maximum in a subtree
+     */
+    friend dt_tuple findMin(std::shared_ptr<bnode> node) {
+        auto dist = 0;
+        auto first_subtree = node->_childTrees[dist];
+        if(first_subtree)
+           return(findMin(first_subtree));
+        return dt_tuple(dist, node);
+    }
+
+    friend dt_tuple findMax(std::shared_ptr<bnode> node) {
+        auto dist = std::distance(std::begin(node->_childVals), std::end(node->_childVals));
+        auto final_subtree = node->_childTrees[dist];
+        if(final_subtree)
+           return findMax(final_subtree);
+        return dt_tuple(dist - 1, node);
+    }
+
+    friend iterator convert_tuple(dt_tuple pair) {
+        auto dist = pair.first;
+        auto tree = pair.second;
+        auto vec_it = tree->_childVals.begin() + dist;
+        return iterator(vec_it, tree);
     }
     /**
         * Disposes of all internal resources, which includes
@@ -304,7 +402,9 @@ public:
         * inserted using the insert operation.
         * Check that your implementation does not leak memory!
         */
-    ~btree(){};
+    ~btree() {
+        _root.reset();
+    }
 };
 
 #endif
