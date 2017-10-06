@@ -25,31 +25,22 @@
 template <typename T>
 class btree {
 private:
-    // The details of your implementation go here
-    // TODO: Combine vals and trees?
-    //       In total you will have n + 1 sub-trees.
-    //       Each sub-tree has a value, and their child have to be strictly less than that value
-    //              but higher than the immediate preceding sub-tree
-    //       Right most subtree will be tricky, but never include the (n + 1)th value at any point, since that is imaginary.
     class bnode {
     public:
+        // There are n-1 sub-trees in between the n values.
+        // There are one sub-tree in each end
+        // Thus in total we have n + 1 sub trees
         unsigned int _size;
         std::vector<T> _childVals;
         std::vector<std::shared_ptr<bnode>> _childTrees;
         std::weak_ptr<bnode> _parent;
 
         bnode(size_t maxNodeElems = 40, std::shared_ptr<bnode> parent = nullptr) : _size(maxNodeElems), _childTrees(_size + 1), _parent(parent) {
+            // reserve space instead of populating them for easy sorted insertion.
             _childVals.reserve(_size);
-            // There are n-1 sub-trees in between the n values.
-            // There are one sub-tree in each end
-            // Thus in total we have n + 1 sub trees
         };
 
-        ~bnode() {
-            // _parent.reset();
-            // _childVals.erase(_childVals.begin(), _childVals.end());
-            // _childTrees.erase(_childTrees.begin(), _childTrees.end());
-        };
+        ~bnode() = default;
         /**
          * Goes through the tree using level-order traversal a.k.a bfs
          * Returns a vector of the values
@@ -66,9 +57,8 @@ private:
             return res;
         }
     };
-
+    // Tree just has root
     std::shared_ptr<bnode> _root;
-
     using dt_tuple = std::pair<size_t, std::shared_ptr<bnode>>;
 
 public:
@@ -77,15 +67,11 @@ public:
     using const_iterator = btree_iterator<T, std::add_const>;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-    friend const_iterator;
     friend iterator;
+    friend const_iterator;
     friend reverse_iterator;
     friend const_reverse_iterator;
 
-
-    // friend class const_btree_iterator<T>;
-
-    // typedef const_btree_iterator<T> const_iterator;
     /**
      * Constructs an empty btree.    Note that
      * the elements stored in your btree must
@@ -249,6 +235,7 @@ public:
          auto vec_it = tree->_childVals.begin() + dist;
          return iterator(vec_it, tree);
      }
+
      const_iterator begin() const {
          return cbegin();
      }
@@ -274,26 +261,6 @@ public:
         return iterator(vec_it, tree, (*vec_it != elem));
     };
 
-    dt_tuple find(const T& elem, std::shared_ptr<bnode> node) const {
-        auto current = node;
-        while (true) {
-            auto c_nodes = current->_childVals;
-            auto c_trees = current->_childTrees;
-            auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
-            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
-            if(lower_bound != c_nodes.end()) {
-                if(*lower_bound == elem) {
-                    return dt_tuple(subtree_idx , current);
-                }
-            }
-            auto subtree = c_trees[subtree_idx];
-            if (subtree)
-                current = subtree;
-            else
-                break;
-        }
-        return findMax(_root);
-    };
     /**
         * Identical in functionality to the non-const version of find,
         * save the fact that what's pointed to by the returned iterator
@@ -341,7 +308,10 @@ public:
     std::pair<iterator, bool> insert(const T& elem) {
         return insert(elem, _root);
     };
-
+    /**
+     * Inserts element to a subtree, used to be recursive, now it's iterative.
+     * If found returns a tuple, the iterator and a bool.
+     */
     std::pair<iterator, bool> insert(const T& elem, std::shared_ptr<bnode> node) {
         auto current = node;
         while (true) {
@@ -366,6 +336,35 @@ public:
         }
         return std::make_pair<iterator, bool>(end(), false);
     }
+    /**
+     * Finds an element in a given subtree
+     */
+    dt_tuple find(const T& elem, std::shared_ptr<bnode> node) const {
+        auto current = node;
+        while (true) {
+            auto c_nodes = current->_childVals;
+            auto c_trees = current->_childTrees;
+            // There are n nodes
+            // There are n + 1 subtrees
+            // Lower bound finds the first iterator in iterator that is >= a given value
+            // If not found, it returns the end iterator
+            // distance(nodes.begin, nodes.end) = n (since the ending iterator goes past the actual end)
+            // Thus if we have to look at a subtree, distance(nodes.begin, lower_bound) will always give the only possible subtree that the element is in
+            auto lower_bound = std::lower_bound(c_nodes.begin(), c_nodes.end(), elem);
+            auto subtree_idx = std::distance(c_nodes.begin(), lower_bound);
+            if(lower_bound != c_nodes.end()) {
+                if(*lower_bound == elem) {
+                    return dt_tuple(subtree_idx , current);
+                }
+            }
+            auto subtree = c_trees[subtree_idx];
+            if (subtree)
+                current = subtree;
+            else
+                break;
+        }
+        return findMax(_root);
+    };
     /**
      * Helper functions, one finds local minimum and the other find local maximum in a subtree
      */

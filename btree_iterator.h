@@ -51,6 +51,12 @@ public:
         return &(operator*());
     }
     // Movement
+    btree_iterator operator++(int) {
+        auto old_val = *this;
+        operator++();
+        return old_val;
+    }
+
     btree_iterator& operator++() {
         auto currTree = _currTree.lock();
         auto curr_val = *_currNode;
@@ -94,6 +100,11 @@ public:
         return *this;
     };
 
+    btree_iterator operator--(int) {
+        auto old_val = *this;
+        operator--();
+        return old_val;
+    }
     btree_iterator& operator--() {
         if (_end) {
             _end = false;
