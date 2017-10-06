@@ -84,7 +84,7 @@ public:
                     *this = btree_iterator(vec_it, tree, true);
                     break;
                 }
-                auto &p_vals = shared_prnt->_childVals;
+                auto &p_vals = parent_tree->_childVals;
                 auto lower_bound = std::lower_bound(p_vals.begin(), p_vals.end(), curr_val);
                 _currNode = lower_bound;
                 _currTree = parent_tree;
