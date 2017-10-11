@@ -16,6 +16,7 @@
 #include <vector>
 #include <memory>
 #include <iterator>
+#include <queue>
 // we better include the iterator
 #include "btree_iterator.h"
 
@@ -48,11 +49,28 @@ private:
         std::vector<T> bfs() const {
             // Copy all values
             std::vector<T> res(_childVals);
-            for(auto child : _childTrees) {
+            std::queue<std::shared_ptr<bnode>> bfs_q;
+
+            for (auto child : _childTrees) {
                 if(!child)
                     continue;
-                auto c_res = (*child).bfs();
-                std::move(c_res.begin(), c_res.end(), std::back_inserter(res));
+                bfs_q.push(child);
+            }
+            // for(auto child : _childTrees) {
+            //     if(!child)
+            //         continue;
+            //     auto c_res = (*child).bfs();
+            //     std::move(c_res.begin(), c_res.end(), std::back_inserter(res));
+            // }
+            while (!bfs_q.empty()) {
+                auto front = bfs_q.front();
+                bfs_q.pop();
+                std::copy(front->_childVals.begin(), front->_childVals.end(), std::back_inserter(res));
+                for (auto childTree : front->_childTrees) {
+                    if(!childTree)
+                        continue;
+                    bfs_q.push(childTree);
+                }
             }
             return res;
         }
@@ -357,7 +375,7 @@ public:
                     return dt_tuple(subtree_idx , current);
                 }
             }
-            auto subtree = c_trees[subtree_idx];
+            auto &subtree = c_trees[subtree_idx];
             if (subtree)
                 current = subtree;
             else
